@@ -8,9 +8,9 @@ export function runDeterministicChecks(
   sources: ProvidedSource[]
 ): Finding[] {
   const findings: Finding[] = [];
-  const activeSources = sources.filter((s) => !s.is_expired);
+  const activeSources = sources.filter((s) => !s.expired);
 
-  // 1. Banned terminology (matches quoted terms in terminology sources)
+  // 1. Banned terminology
   for (const src of activeSources.filter((s) => s.type === "terminology")) {
     const quotedTerms = [...src.content.matchAll(/["“']([^"”']{2,40})["”']/g)].map(
       (m) => m[1]
@@ -24,10 +24,17 @@ export function runDeterministicChecks(
           severity: "blocking",
           flagged_text: match[0],
           explanation: `[Instant Rule] Banned term "${match[0]}" violates "${src.title}".`,
-          source_id: src.id,
-          source_version: src.version,
-          source_quote: src.content.slice(0, 240),
+          evidence_status: "rule_applies",
+          evidence: [
+            {
+              source_id: src.id,
+              source_version: src.version,
+              quote: src.content.slice(0, 240),
+            },
+          ],
+          rule_references: [src.id],
           suggested_replacement: null,
+          suggested_action: null,
         });
       }
     }
@@ -41,10 +48,11 @@ export function runDeterministicChecks(
       severity: "blocking",
       flagged_text: guaranteeMatch[0],
       explanation: `[Instant Rule] Absolute guarantee "${guaranteeMatch[0]}" is not allowed.`,
-      source_id: null,
-      source_version: null,
-      source_quote: null,
+      evidence_status: "no_support_found_in_reviewed_sources",
+      evidence: [],
+      rule_references: [],
       suggested_replacement: null,
+      suggested_action: null,
     });
   }
 
@@ -57,10 +65,17 @@ export function runDeterministicChecks(
         severity: "blocking",
         flagged_text: draft.slice(0, Math.min(80, draft.length)),
         explanation: `[Instant Rule] Missing required disclosure from "${src.title}".`,
-        source_id: src.id,
-        source_version: src.version,
-        source_quote: requiredText,
+        evidence_status: "rule_not_met",
+        evidence: [
+          {
+            source_id: src.id,
+            source_version: src.version,
+            quote: requiredText.slice(0, 1000),
+          },
+        ],
+        rule_references: [src.id],
         suggested_replacement: `${draft.trim()}\n\n${requiredText}`,
+        suggested_action: null,
       });
     }
   }
@@ -85,10 +100,17 @@ export function runDeterministicChecks(
         severity: "blocking",
         flagged_text: raw,
         explanation: `[Instant Rule] "${raw}" conflicts with approved fact "${conflictingFact.raw}" in "${conflictingFact.source.title}".`,
-        source_id: conflictingFact.source.id,
-        source_version: conflictingFact.source.version,
-        source_quote: conflictingFact.source.content.slice(0, 240),
+        evidence_status: "contradicted",
+        evidence: [
+          {
+            source_id: conflictingFact.source.id,
+            source_version: conflictingFact.source.version,
+            quote: conflictingFact.source.content.slice(0, 240),
+          },
+        ],
+        rule_references: [],
         suggested_replacement: conflictingFact.raw,
+        suggested_action: null,
       });
     }
   }
